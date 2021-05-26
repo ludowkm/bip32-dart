@@ -9,13 +9,13 @@ import 'dart:convert';
 class Bip32Type {
   int public;
   int private;
-  Bip32Type({this.public, this.private});
+  Bip32Type({required this.public, required this.private});
 
 }
 class NetworkType {
   int wif;
   Bip32Type bip32;
-  NetworkType({this.wif, this.bip32});
+  NetworkType({required this.wif, required this.bip32});
 }
 
 final _BITCOIN = new NetworkType(
@@ -30,8 +30,8 @@ const UINT31_MAX = 2147483647; // 2^31 - 1
 const UINT32_MAX = 4294967295; // 2^32 - 1
 /// Checks if you are awesome. Spoiler: you are.
 class BIP32 {
-  Uint8List _d;
-  Uint8List _Q;
+  Uint8List? _d;
+  Uint8List? _Q;
   Uint8List chainCode;
   int depth = 0;
   int index = 0;
@@ -40,11 +40,20 @@ class BIP32 {
   BIP32(this._d, this._Q, this.chainCode, this.network);
 
   Uint8List get publicKey {
-    if (_Q == null) _Q = ecc.pointFromScalar(_d, true);
-    return _Q;
+    if (_d == null) {
+      throw StateError('You don\'t have private key to extract');
+    }
+    if (_Q == null) _Q = ecc.pointFromScalar(_d!, true);
+    return _Q!;
   }
 
-  Uint8List get privateKey => _d;
+  Uint8List get privateKey {
+    if (_d == null) {
+      throw StateError('You don\'t have permission to get private key');
+    }
+    return _d!;
+  }
+
   Uint8List get identifier => hash160(publicKey);
   Uint8List get fingerprint => identifier.sublist(0, 4);
 
@@ -159,7 +168,7 @@ class BIP32 {
     return ecc.verify(hash, publicKey, signature);
   }
 
-  factory BIP32.fromBase58(String string, [NetworkType nw]) {
+  factory BIP32.fromBase58(String string, [NetworkType? nw]) {
     Uint8List buffer = bs58check.decode(string);
     if (buffer.length != 78) throw new ArgumentError("Invalid buffer length");
     NetworkType network = nw ?? _BITCOIN;
@@ -203,7 +212,7 @@ class BIP32 {
     return hd;
   }
 
-  factory BIP32.fromPublicKey(Uint8List publicKey, Uint8List chainCode, [NetworkType nw]) {
+  factory BIP32.fromPublicKey(Uint8List publicKey, Uint8List chainCode, [NetworkType? nw]) {
     NetworkType network = nw ?? _BITCOIN;
     if (!ecc.isPoint(publicKey)) {
       throw new ArgumentError("Point is not on the curve");
@@ -211,14 +220,14 @@ class BIP32 {
     return new BIP32(null, publicKey, chainCode, network);
   }
 
-  factory BIP32.fromPrivateKey(Uint8List privateKey, Uint8List chainCode, [NetworkType nw]) {
+  factory BIP32.fromPrivateKey(Uint8List privateKey, Uint8List chainCode, [NetworkType? nw]) {
     NetworkType network = nw ?? _BITCOIN;
     if (privateKey.length != 32) throw new ArgumentError("Expected property privateKey of type Buffer(Length: 32)");
     if (!ecc.isPrivate(privateKey)) throw new ArgumentError("Private key not in range [1, n]");
     return new BIP32(privateKey, null, chainCode, network);
   }
 
-  factory BIP32.fromSeed(Uint8List seed, [NetworkType nw]) {
+  factory BIP32.fromSeed(Uint8List seed, [NetworkType? nw]) {
     if (seed.length < 16) {
       throw new ArgumentError("Seed should be at least 128 bits");
     }
@@ -226,7 +235,7 @@ class BIP32 {
       throw new ArgumentError("Seed should be at most 512 bits");
     }
     NetworkType network = nw ?? _BITCOIN;
-    final I = hmacSHA512(utf8.encode("Bitcoin seed"), seed);
+    final I = hmacSHA512(Uint8List.fromList(utf8.encode("Bitcoin seed")), seed);
     final IL = I.sublist(0, 32);
     final IR = I.sublist(32);
     return BIP32.fromPrivateKey(IL, IR, network);
