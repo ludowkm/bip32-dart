@@ -168,6 +168,11 @@ class BIP32 {
     return ecc.verify(hash, publicKey, signature);
   }
 
+  static bool isPrivateKeyValid(String privateKey) {
+    if (privateKey.length != 32 || !ecc.isPrivate(bs58check.decode(privateKey))) return false;
+    return true;
+  }
+
   factory BIP32.fromBase58(String string, [NetworkType? nw]) {
     Uint8List buffer = bs58check.decode(string);
     if (buffer.length != 78) throw new ArgumentError("Invalid buffer length");
